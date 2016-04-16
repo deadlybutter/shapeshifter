@@ -48,6 +48,8 @@
       var players = {};
       this.socket = {};
 
+      var lasers = {};
+
       function loadShip(done) {
         var mtlLoader = new THREE.MTLLoader();
         mtlLoader.setBaseUrl('');
@@ -131,6 +133,14 @@
           ship.scale.x -= SCALE_CHANGE;
           ship.scale.y -= SCALE_CHANGE;
           ship.scale.z -= SCALE_CHANGE;
+        });
+
+        kd.SPACE.down(function() {
+          radius = ship.scale.x * .25;
+          var laserGeom = new THREE.CylinderGeometry(radius, radius, 20);
+          var material = new THREE.MeshBasicMaterial({color: 0xffff00});
+          var laser = new THREE.Mesh(laserGeom, material);
+          scene.add(laser);
         });
       }
 
