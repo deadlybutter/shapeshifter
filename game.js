@@ -1,11 +1,6 @@
 var ships = {};
 
-function makeId() {
-  return Math.random().toString(36).substring(7);
-}
-
-this.createNewShip = function() {
-  var id = makeId();
+this.createNewShip = function(id) {
   var ship = {
     id: id,
     loc: {
@@ -32,9 +27,17 @@ this.createNewShip = function() {
 }
 
 this.deleteShip = function(id) {
+  ships[id] = {};
   delete ships[id];
 }
 
 this.getShips = function() {
   return ships;
+}
+
+this.updateShip = function(ship) {
+  if (ship == undefined || ship.id == undefined || ships[ship.id] == undefined) {
+    return;
+  }
+  ships[ship.id] = ship;
 }

@@ -11,27 +11,23 @@ app.get('/', function (req, res) {
 });
 
 io.on('connection', function (socket) {
-  ship = game.createNewShip();
-  
-  socket.emit('init', ship);
   socket.emit('players', game.getShips());
+
+  ship = game.createNewShip(socket.id);
+  socket.emit('init', ship);
   socket.broadcast.emit('new-player', ship);
 
-  // socket.on('my other event', function (data) {
-  //   console.log(data);
-  // });
+  socket.on('loc-update', function (data) {
+    game.updateShip(data);
+    socket.broadcast.emit('loc-change', data);
+  });
 
   socket.on('disconnect', function () {
-    game.deleteShip(ship.id);
-    io.emit('player-disconnect', ship.id);
+    game.deleteShip(socket.id);
+    socket.broadcast.emit('player-disconnect', socket.id);
   });
 });
 
 server.listen(process.env.PORT || 5000, function () {
   console.log('Example app listening');
 });
-
-// save online players, position + rotation + scale (Location obj?)
-// when player connects, create Location obj + send them existing players & tell other players
-// when player disconnects, discard Location obj & tell other players
-// when player moves/rotates/scales (onLocationChange), update Location obj & tell other players

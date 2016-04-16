@@ -38,6 +38,7 @@
 
       var renderer = new THREE.WebGLRenderer();
       renderer.setSize( window.innerWidth, window.innerHeight );
+      renderer.setClearColor(0x2C2130);
       document.body.appendChild( renderer.domElement );
 
       var shipObj;
@@ -45,6 +46,7 @@
       var playerId;
 
       var players = {};
+      this.socket = {};
 
       function loadShip(done) {
         var mtlLoader = new THREE.MTLLoader();
@@ -133,17 +135,28 @@
       }
 
       function updateShipFromLoc(loc, ship) {
+        if (ship == undefined || loc == undefined) {
+          return;
+        }
         ship.position.set(loc.pos.x, loc.pos.y, loc.pos.z);
         ship.rotation.set(loc.rot.x, loc.rot.y, loc.rot.z);
         ship.scale.set(loc.scale.x, loc.scale.y, loc.scale.z);
       }
 
-      function newPlayer(p, noSave) {
-        if (!noSave) {
-          players[p.id] = p;
+      function newPlayer(p) {
+        if (p == undefined || p.id == undefined) {
+          return;
         }
+        ship = buildShip(p.loc.pos.x, p.loc.pos.y, p.loc.pos.z);
+        ship.ship_id = p.id;
+        players[p.id] = ship;
+        return ship;
+      }
 
-        return buildShip(p.loc.pos.x, p.loc.pos.y, p.loc.pos.z);
+      function deletePlayer(id) {
+        scene.remove(players[id]);
+        players[id] = {};
+        delete players[id];
       }
 
       function handleSocket(socket) {
@@ -153,9 +166,8 @@
         });
 
         socket.on('players', function(pl) {
-          players = pl;
           Object.keys(pl).forEach(function(key) {
-              newPlayer(pl[key], true);
+              newPlayer(pl[key]);
           });
         });
 
@@ -164,7 +176,45 @@
         });
 
         socket.on('player-disconnect', function(id) {
-          delete players[id];
+          deletePlayer(id);
+        });
+
+        socket.on('loc-change', function(p) {
+          updateShipFromLoc(p.loc, players[p.id]);
+        });
+
+        socket.on('disconnect', function() {
+          Object.keys(players).forEach(function(key) {
+              deletePlayer(key);
+          });
+          players = {};
+        });
+      }
+
+      function updateServer(socket) {
+        if (playerShip == undefined) {
+          return;
+        }
+
+        this.socket.emit('loc-update', {
+          id: playerId,
+          loc: {
+            pos: {
+              x: playerShip.position.x,
+              y: playerShip.position.y,
+              z: playerShip.position.z
+            },
+            rot: {
+              x: playerShip.rotation.x,
+              y: playerShip.rotation.y,
+              z: playerShip.rotation.z
+            },
+            scale: {
+              x: playerShip.scale.x,
+              y: playerShip.scale.y,
+              z: playerShip.scale.z
+            }
+          }
         });
       }
 
@@ -179,7 +229,8 @@
         camera.position.z = COCKPIT_Z;
 
         handleControls(playerShip);
-        handleSocket(io());
+        this.socket = io();
+        handleSocket(this.socket);
       });
 
       var directional = new THREE.DirectionalLight(0xffffff, 0.7);
@@ -187,6 +238,7 @@
 
       function render() {
         kd.tick();
+        updateServer(this.socket);
 
       	requestAnimationFrame(render);
       	renderer.render(scene, camera);
