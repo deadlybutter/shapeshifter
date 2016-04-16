@@ -12,7 +12,26 @@
 
   <body>
     <script src="three.min.js"></script>
+    <script src="http://threejs.org/examples/js/loaders/OBJLoader.js"></script>
+    <script src="http://threejs.org/examples/js/loaders/MTLLoader.js"></script>
+    <script src="keydrown.min.js"></script>
 		<script>
+
+      Math.radians = function(degrees) {
+        return degrees * Math.PI / 180;
+      };
+
+      Math.degrees = function(radians) {
+        return radians * 180 / Math.PI;
+      };
+
+      var BASE_SPEED = 0.5;
+      var BASE_ROTATION = 0.7;
+      var SCALE_CHANGE = 0.01;
+      var COCKPIT_X = -5;
+      var COCKPIT_Y = 5;
+      var COCKPIT_Z = -0.5;
+
       var scene = new THREE.Scene();
       var camera = new THREE.PerspectiveCamera( 75, window.innerWidth / window.innerHeight, 0.1, 1000 );
 
@@ -20,18 +39,124 @@
       renderer.setSize( window.innerWidth, window.innerHeight );
       document.body.appendChild( renderer.domElement );
 
-      var geometry = new THREE.BoxGeometry( 1, 1, 1 );
-      var material = new THREE.MeshBasicMaterial( { color: 0x00ff00 } );
-      var cube = new THREE.Mesh( geometry, material );
-      scene.add( cube );
+      var shipObj;
 
-      camera.position.z = 5;
+      var playerShip;
+      var testShip;
+
+      function loadShip(done) {
+        var mtlLoader = new THREE.MTLLoader();
+        mtlLoader.setBaseUrl('');
+        mtlLoader.setPath('');
+        mtlLoader.load('spaceship.mtl', function(materials) {
+          materials.preload();
+          var objLoader = new THREE.OBJLoader();
+          objLoader.setMaterials(materials);
+          objLoader.load('spaceship.obj', function(object) {
+            shipObj = object;
+            done();
+          });
+        });
+
+      }
+
+      function buildShip(x, y, z) {
+        var newShip = shipObj.clone();
+        newShip.position.set(x, y, z);
+
+        var light = new THREE.PointLight(0x46C7F2, 2, 100);
+        newShip.add(light);
+
+        light.position.x = COCKPIT_X;
+        light.position.y = COCKPIT_Y;
+        light.position.z = COCKPIT_Z;
+
+        scene.add(newShip);
+
+        return newShip;
+      }
+
+      function getShipSpeed(ship) {
+        return BASE_SPEED / ship.scale.x;
+      }
+
+      function getShipRotation(ship) {
+        return Math.radians(BASE_ROTATION / ship.scale.x);
+      }
+
+      function handleControls(ship) {
+        kd.W.down(function () {
+          ship.translateOnAxis(new THREE.Vector3(-1, 0, 0), getShipSpeed(ship));
+        });
+
+        kd.S.down(function () {
+          ship.translateOnAxis(new THREE.Vector3(1, 0, 0), getShipSpeed(ship));
+        });
+
+        kd.A.down(function () {
+          ship.rotateOnAxis(new THREE.Vector3(0, 1, 0), getShipRotation(ship));
+        });
+
+        kd.D.down(function () {
+          ship.rotateOnAxis(new THREE.Vector3(0, -1, 0), getShipRotation(ship));
+        });
+
+        kd.UP.down(function() {
+          ship.rotateOnAxis(new THREE.Vector3(0, 0, -1), getShipRotation(ship));
+        });
+
+        kd.DOWN.down(function() {
+          ship.rotateOnAxis(new THREE.Vector3(0, 0, 1), getShipRotation(ship));
+        });
+
+        kd.LEFT.down(function() {
+          ship.rotateOnAxis(new THREE.Vector3(1, 0, 0), getShipRotation(ship));
+        });
+
+        kd.RIGHT.down(function() {
+          ship.rotateOnAxis(new THREE.Vector3(-1, 0, 0), getShipRotation(ship));
+        });
+
+        kd.ENTER.down(function() {
+          ship.scale.x += SCALE_CHANGE;
+          ship.scale.y += SCALE_CHANGE;
+          ship.scale.z += SCALE_CHANGE;
+        });
+
+        kd.SHIFT.down(function() {
+          ship.scale.x -= SCALE_CHANGE;
+          ship.scale.y -= SCALE_CHANGE;
+          ship.scale.z -= SCALE_CHANGE;
+        });
+      }
+
+      loadShip(function init() {
+        playerShip = buildShip(0, 0, 0);
+        playerShip.add(camera);
+
+        camera.rotation.y = Math.radians(90);
+
+        camera.position.x = COCKPIT_X;
+        camera.position.y = COCKPIT_Y;
+        camera.position.z = COCKPIT_Z;
+
+        testShip = buildShip(-50, 0, 25);
+        testShip.scale.set(2, 2, 2);
+
+        handleControls(playerShip);
+      });
+
+      var directional = new THREE.DirectionalLight(0xffffff, 0.7);
+      scene.add(directional);
 
       function render() {
-      	requestAnimationFrame( render );
-      	renderer.render( scene, camera );
+        kd.tick();
+
+      	requestAnimationFrame(render);
+      	renderer.render(scene, camera);
       }
       render();
+
 		</script>
   </body>
 
