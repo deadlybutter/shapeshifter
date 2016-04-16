@@ -11,6 +11,7 @@
   </head>
 
   <body>
+    <script src="https://cdn.socket.io/socket.io-1.0.0.js"></script>
     <script src="three.min.js"></script>
     <script src="http://threejs.org/examples/js/loaders/OBJLoader.js"></script>
     <script src="http://threejs.org/examples/js/loaders/MTLLoader.js"></script>
@@ -40,9 +41,10 @@
       document.body.appendChild( renderer.domElement );
 
       var shipObj;
-
       var playerShip;
-      var testShip;
+      var playerId;
+
+      var players = {};
 
       function loadShip(done) {
         var mtlLoader = new THREE.MTLLoader();
@@ -130,6 +132,42 @@
         });
       }
 
+      function updateShipFromLoc(loc, ship) {
+        ship.position.set(loc.pos.x, loc.pos.y, loc.pos.z);
+        ship.rotation.set(loc.rot.x, loc.rot.y, loc.rot.z);
+        ship.scale.set(loc.scale.x, loc.scale.y, loc.scale.z);
+      }
+
+      function newPlayer(p, noSave) {
+        if (!noSave) {
+          players[p.id] = p;
+        }
+
+        return buildShip(p.loc.pos.x, p.loc.pos.y, p.loc.pos.z);
+      }
+
+      function handleSocket(socket) {
+        socket.on('init', function(data) {
+          playerId = data.id;
+          updateShipFromLoc(data.loc, playerShip);
+        });
+
+        socket.on('players', function(pl) {
+          players = pl;
+          Object.keys(pl).forEach(function(key) {
+              newPlayer(pl[key], true);
+          });
+        });
+
+        socket.on('new-player', function(np) {
+          newPlayer(np);
+        });
+
+        socket.on('player-disconnect', function(id) {
+          delete players[id];
+        });
+      }
+
       loadShip(function init() {
         playerShip = buildShip(0, 0, 0);
         playerShip.add(camera);
@@ -140,10 +178,8 @@
         camera.position.y = COCKPIT_Y;
         camera.position.z = COCKPIT_Z;
 
-        testShip = buildShip(-50, 0, 25);
-        testShip.scale.set(2, 2, 2);
-
         handleControls(playerShip);
+        handleSocket(io());
       });
 
       var directional = new THREE.DirectionalLight(0xffffff, 0.7);
