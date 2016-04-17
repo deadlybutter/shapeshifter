@@ -1,8 +1,26 @@
-var ships = {};
+var cars = {};
+var starPos = {};
 
-this.createNewShip = function(id) {
-  var ship = {
+Math.getRandomInt = function(min, max) {
+  return Math.floor(Math.random() * (max - min + 1)) + min;
+}
+
+this.starInit = function() {
+  starPos = {
+    x: Math.getRandomInt(-400, 400),
+    y: Math.getRandomInt(-400, 400),
+    z: Math.getRandomInt(-400, 400)
+  }
+}
+
+this.getStar = function() {
+  return starPos;
+}
+
+this.createNewCar = function(id) {
+  var car = {
     id: id,
+    type: Math.getRandomInt(1, 11),
     loc: {
       pos: {
         x: 0,
@@ -13,31 +31,29 @@ this.createNewShip = function(id) {
         x: 0,
         y: 0,
         z: 0
-      },
-      scale: {
-        x: 1,
-        y: 1,
-        z: 1
       }
     }
   }
-  ships[id] = ship;
-
-  return ship;
+  cars[id] = car;
+  return car;
 }
 
-this.deleteShip = function(id) {
-  ships[id] = {};
-  delete ships[id];
+this.deleteCar = function(id) {
+  cars[id] = {};
+  delete cars[id];
 }
 
-this.getShips = function() {
-  return ships;
+this.getCars = function() {
+  return cars;
 }
 
-this.updateShip = function(ship) {
-  if (ship == undefined || ship.id == undefined || ships[ship.id] == undefined) {
+this.getCar = function(id) {
+  return cars[id];
+}
+
+this.updateCar = function(car) {
+  if (car == undefined || car.id == undefined || cars[car.id] == undefined) {
     return;
   }
-  ships[ship.id] = ship;
+  cars[car.id] = car;
 }
