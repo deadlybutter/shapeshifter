@@ -48,6 +48,24 @@
       var playerId;
       var playerType;
 
+      var customCarCameras = {
+        1: {
+          x: 4,
+          y: 175,
+          z: 10
+        },
+        3: {
+          x: 38,
+          y: 135,
+          z: -60
+        },
+        10: {
+          x: -28,
+          y: 150,
+          z: -150
+        }
+      }
+
       var starObj;
 
       var players = {};
@@ -89,9 +107,18 @@
         playerCar = buildCar(type, x, y, z);
         playerCar.add(camera);
         camera.rotation.y = Math.radians(180);
-        camera.position.x = 0;
-        camera.position.y = 250;
-        camera.position.z = -400;
+
+        var customCamPos = customCarCameras[type];
+        if (customCamPos) {
+          camera.position.x = customCamPos.x;
+          camera.position.y = customCamPos.y;
+          camera.position.z = customCamPos.z;
+        }
+        else {
+          camera.position.x = 0;
+          camera.position.y = 250;
+          camera.position.z = -400;
+        }
       }
 
       function changeCar(car, p) {
@@ -221,7 +248,11 @@
         raycaster.setFromCamera(new THREE.Vector2(0, 0), camera);
         var intersections = raycaster.intersectObject(starObj);
         if (intersections.length > 0) {
-          this.socket.emit('got-star', {});
+          intersections.forEach(function(i) {
+            if (i.distance <= 20) {
+              this.socket.emit('got-star', {});
+            }
+          });
         }
 
         this.socket.emit('loc-update', {
