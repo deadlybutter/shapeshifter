@@ -21,7 +21,8 @@ io.on('connection', function (socket) {
   socket.emit('players', game.getCars());
 
   if (process.env.PRODUCTION) {
-    stathat.trackEZCount("thedeadlybutter+ld35@gmail.com", "user connected", 1, function(status, json) {});
+    console.log("HALLO");
+    stathat.trackEZCount("thedeadlybutter+ld35@gmail.com", "user connected", 1, function(status, json) {console.log("UH", status, json)});
   }
 
   car = game.createNewCar(socket.id);
