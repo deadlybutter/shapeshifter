@@ -3,6 +3,8 @@ var app = express();
 var server = require('http').Server(app);
 var io = require('socket.io')(server);
 var game = require(__dirname + '/game');
+var stathat = require('stathat');
+
 game.starInit();
 
 app.use(express.static('public'));
@@ -11,8 +13,16 @@ app.get('/', function (req, res) {
   res.sendFile(__dirname + '/index.html');
 });
 
+app.get('/game', function (req, res) {
+  res.sendFile(__dirname + '/game.html');
+});
+
 io.on('connection', function (socket) {
   socket.emit('players', game.getCars());
+
+  if (process.env.PRODUCTION) {
+    stathat.trackEZCount("thedeadlybutter+ld35@gmail.com", "user connected", 1, function(status, json) {});
+  }
 
   car = game.createNewCar(socket.id);
   socket.emit('init', car);

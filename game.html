@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html>
+
+  <head>
+    <meta charset=utf-8>
+    <title>Cars & Stars</title>
+    <style>
+      body { margin: 0; }
+      canvas { width: 100%; height: 100% }
+    </style>
+  </head>
+
+  <body>
+    <script src="https://cdn.socket.io/socket.io-1.0.0.js"></script>
+    <script src="three.min.js"></script>
+    <script src="SceneLoader.js"></script>
+    <script src="OBJLoader.js"></script>
+    <script src="keydrown.min.js"></script>
+		<script>
+
+      Math.radians = function(degrees) {
+        return degrees * Math.PI / 180;
+      };
+
+      Math.degrees = function(radians) {
+        return radians * 180 / Math.PI;
+      };
+
+      Math.getRandomInt = function(min, max) {
+        return Math.floor(Math.random() * (max - min + 1)) + min;
+      }
+
+      var SPEED = 0.5;
+      var ROTATION_SPEED = 0.02;
+
+      var scene = new THREE.Scene();
+      var camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 100000);
+
+      var renderer = new THREE.WebGLRenderer();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.setClearColor(0x2C2130);
+      document.body.appendChild(renderer.domElement);
+
+      var raycaster = new THREE.Raycaster();
+
+      var carObj = [];
+      var playerCar;
+      var playerId;
+      var playerType;
+
+      var customCarCameras = {
+        1: {
+          x: 4,
+          y: 175,
+          z: 10
+        },
+        3: {
+          x: 38,
+          y: 135,
+          z: -60
+        },
+        10: {
+          x: -28,
+          y: 150,
+          z: -150
+        }
+      }
+
+      var starObj;
+
+      var players = {};
+      this.socket = {};
+
+      var lasers = {};
+
+      function loadCar(done, index) {
+        if (index > 12) {
+          var loader = new THREE.OBJLoader();
+          loader.load('star.obj',
+          	function (object) {
+          		starObj = object.children[0];
+              starObj.material = new THREE.MeshPhongMaterial({color: 0xF5E31B, shininess: 10, emissiveIntensity: 1, emissive: 0xffff99});
+              scene.add(starObj);
+              done();
+          	});
+          return;
+        }
+        var loader = new THREE.SceneLoader();
+        loader.load('classic' + index + '.js', function (result) {
+          result.scene.children.forEach(function(element) {
+            element.material = new THREE.MeshNormalMaterial();
+          });
+          carObj[index] = result.scene;
+          loadCar(done, index + 1);
+        });
+      }
+
+      function buildCar(type, x, y, z) {
+        var newCar = carObj[type].clone();
+        newCar.position.set(x, y, z);
+        newCar.scale.set(0.05, 0.05, 0.05);
+        scene.add(newCar);
+        return newCar;
+      }
+
+      function buildClientCar(type, x, y, z, doLook) {
+        playerCar = buildCar(type, x, y, z);
+        playerCar.add(camera);
+        camera.rotation.y = Math.radians(180);
+
+        var customCamPos = customCarCameras[type];
+        if (customCamPos) {
+          camera.position.x = customCamPos.x;
+          camera.position.y = customCamPos.y;
+          camera.position.z = customCamPos.z;
+        }
+        else {
+          camera.position.x = 0;
+          camera.position.y = 250;
+          camera.position.z = -400;
+        }
+      }
+
+      function changeCar(car, p) {
+        scene.remove(car);
+        newPlayer(p);
+      }
+
+      function handleControls() {
+        kd.W.down(function () {
+          playerCar.translateOnAxis(new THREE.Vector3(0, 0, 1), SPEED);
+        });
+
+        kd.S.down(function () {
+          playerCar.translateOnAxis(new THREE.Vector3(0, 0, -1), SPEED);
+        });
+
+        kd.A.down(function () {
+          playerCar.rotateOnAxis(new THREE.Vector3(0, 1, 0), ROTATION_SPEED);
+        });
+
+        kd.D.down(function () {
+          playerCar.rotateOnAxis(new THREE.Vector3(0, -1, 0), ROTATION_SPEED);
+        });
+
+        kd.LEFT.down(function() {
+          playerCar.rotateOnAxis(new THREE.Vector3(0, 0, -1), ROTATION_SPEED);
+        });
+
+        kd.RIGHT.down(function() {
+          playerCar.rotateOnAxis(new THREE.Vector3(0, 0, 1), ROTATION_SPEED);
+        });
+
+        kd.DOWN.down(function() {
+          playerCar.rotateOnAxis(new THREE.Vector3(1, 0, 0), ROTATION_SPEED);
+        });
+
+        kd.UP.down(function() {
+          playerCar.rotateOnAxis(new THREE.Vector3(-1, 0, 0), ROTATION_SPEED);
+        });
+
+        kd.SPACE.press(function() {
+          var newType = Math.getRandomInt(1, 11);
+          playerType = newType;
+          var currentPos = playerCar.position;
+          var currentRot = playerCar.rotation;
+          scene.remove(playerCar);
+          buildClientCar(newType, currentPos.x, currentPos.y, currentPos.z);
+          playerCar.rotation.set(currentRot.x, currentRot.y, currentRot.z);
+        });
+      }
+
+      function updateCarFromLoc(loc, car) {
+        if (car == undefined || loc == undefined) {
+          return;
+        }
+        car.position.set(loc.pos.x, loc.pos.y, loc.pos.z);
+        car.rotation.set(loc.rot.x, loc.rot.y, loc.rot.z);
+      }
+
+      function newPlayer(p) {
+        if (p == undefined || p.id == undefined || p.type == undefined) {
+          return;
+        }
+        car = buildCar(p.type, p.loc.pos.x, p.loc.pos.y, p.loc.pos.z);
+        car.car_id = p.id;
+        players[p.id] = car;
+        return car;
+      }
+
+      function deletePlayer(id) {
+        scene.remove(players[id]);
+        players[id] = {};
+        delete players[id];
+      }
+
+      function handleSocket(socket) {
+        socket.on('init', function(data) {
+          playerId = data.id;
+          playerType = data.type;
+
+          buildClientCar(data.type, 0, 0, 0);
+
+          handleControls();
+          updateCarFromLoc(data.loc, playerCar);
+        });
+
+        socket.on('players', function(pl) {
+          Object.keys(pl).forEach(function(key) {
+            newPlayer(pl[key]);
+          });
+        });
+
+        socket.on('new-player', function(np) {
+          newPlayer(np);
+        });
+
+        socket.on('player-disconnect', function(id) {
+          deletePlayer(id);
+        });
+
+        socket.on('loc-change', function(p) {
+          updateCarFromLoc(p.loc, players[p.id]);
+        });
+
+        socket.on('car-change', function(p) {
+          deletePlayer(p.id);
+          newPlayer(p);
+        });
+
+        socket.on('disconnect', function() {
+          Object.keys(players).forEach(function(key) {
+              deletePlayer(key);
+          });
+          players = {};
+        });
+
+        socket.on('star-pos', function(data) {
+          starObj.position.set(data.x, data.y, data.z);
+        });
+      }
+
+      function updateServer(socket) {
+        if (playerCar == undefined) {
+          return;
+        }
+
+        raycaster.setFromCamera(new THREE.Vector2(0, 0), camera);
+        var intersections = raycaster.intersectObject(starObj);
+        if (intersections.length > 0) {
+          intersections.forEach(function(i) {
+            if (i.distance <= 20) {
+              this.socket.emit('got-star', {});
+            }
+          });
+        }
+
+        this.socket.emit('loc-update', {
+          id: playerId,
+          type: playerType,
+          loc: {
+            pos: {
+              x: playerCar.position.x,
+              y: playerCar.position.y,
+              z: playerCar.position.z
+            },
+            rot: {
+              x: playerCar.rotation.x,
+              y: playerCar.rotation.y,
+              z: playerCar.rotation.z
+            }
+          }
+        });
+      }
+
+      loadCar(function init() {
+        this.socket = io();
+        handleSocket(this.socket);
+      }, 1);
+
+      var directional = new THREE.DirectionalLight(0xffffff, 0.7);
+      scene.add(directional);
+
+      var particles = new THREE.Geometry();
+      var particleRange = 1000;
+      function particleRandom() { return Math.random() * particleRange - (particleRange / 2); }
+      for (var p = 0; p < 4000; p++) {
+        var particle = new THREE.Vector3(particleRandom(), particleRandom(), particleRandom());
+        particles.vertices.push(particle);
+      }
+      var particleMaterial = new THREE.ParticleBasicMaterial({ color: 0xeeeeee, size: 2 });
+      var particleSystem = new THREE.ParticleSystem(particles, particleMaterial);
+      scene.add(particleSystem);
+
+      function render() {
+        kd.tick();
+        updateServer(this.socket);
+
+        if (starObj != undefined) {
+          starObj.rotation.y += Math.radians(1);
+        }
+
+      	requestAnimationFrame(render);
+      	renderer.render(scene, camera);
+      }
+      render();
+
+		</script>
+  </body>
+
+</html>
